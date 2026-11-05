@@ -1,0 +1,14 @@
+FROM python:3.11-slim
+
+# Install dependencies in their own layer BEFORE copying code: Docker caches
+# this layer, so editing rest-server.py doesn't trigger a re-install.
+COPY requirements.txt /srv/requirements.txt
+RUN pip3 install --no-cache-dir -r /srv/requirements.txt
+
+WORKDIR /srv
+COPY rest-server.py /srv/
+
+# -u = unbuffered output, so print() shows up in `kubectl logs` immediately
+ENV PYTHONUNBUFFERED=1
+EXPOSE 5000
+CMD ["python3", "-u", "rest-server.py"]

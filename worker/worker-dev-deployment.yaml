@@ -1,0 +1,67 @@
+#
+# DEVELOPMENT version of the worker deployment.
+#
+# Same as worker-deployment.yaml, except your worker-server.py comes from a
+# ConfigMap instead of being baked into the image. Editing the code then only
+# needs `worker/dev-reload.sh` (seconds), not a 3.5 GB image rebuild.
+#
+#   kubectl create configmap worker-code --from-file=worker/worker-server.py
+#   kubectl apply -f worker/worker-dev-deployment.yaml
+#
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+spec:
+  replicas: 1
+  # Stop the old pod before starting the new one, so a restart never needs
+  # memory for two DEMUCS workers at once.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+      - name: worker
+        # CHANGE ME (the sed command in the build guide does this for you)
+        image: YOUR_DOCKER_USERNAME_HERE/demucs-worker:dev
+        env:
+        - name: REDIS_HOST
+          value: "redis"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: S3_HOST
+          value: "rustfs:9000"   # RustFS object store
+        - name: S3_ACCESS_KEY
+          valueFrom:
+            secretKeyRef: {name: rustfs-creds, key: access_key}
+        - name: S3_SECRET_KEY
+          valueFrom:
+            secretKeyRef: {name: rustfs-creds, key: secret_key}
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 4Gi
+          limits:
+            memory: 7Gi
+        volumeMounts:
+        - name: models
+          mountPath: /data/models
+        - name: scratch
+          mountPath: /tmp/demucs
+        - name: code                      # your code, from the ConfigMap
+          mountPath: /srv/worker-server.py
+          subPath: worker-server.py
+      volumes:
+      - name: models
+        emptyDir: {}
+      - name: scratch
+        emptyDir: {}
+      - name: code
+        configMap:
+          name: worker-code

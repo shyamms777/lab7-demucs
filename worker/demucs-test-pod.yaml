@@ -1,0 +1,26 @@
+#
+# A throwaway pod for running DEMUCS by hand on GKE (Cloud Shell doesn't have
+# the RAM for it). It just sleeps; you copy a song in and `kubectl exec` DEMUCS.
+#
+#   kubectl apply -f worker/demucs-test-pod.yaml
+#   kubectl delete pod demucs-test        # when you're done
+#
+apiVersion: v1
+kind: Pod
+metadata:
+  name: demucs-test
+spec:
+  restartPolicy: Never
+  containers:
+  - name: demucs
+    image: xserrat/facebook-demucs:latest
+    command: ["sleep", "infinity"]   # overrides the image's entrypoint
+    env:
+    - name: TORCH_HOME
+      value: /tmp/models
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 4Gi
+      limits:
+        memory: 7Gi

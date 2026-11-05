@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rest
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rest
+  template:
+    metadata:
+      labels:
+        app: rest               # the Service finds pods by this label
+    spec:
+      containers:
+      - name: rest
+        # CHANGE ME: <your-dockerhub-user>/demucs-rest:<version>
+        image: demucs-rest:v2
+        ports:
+        - containerPort: 5000
+        env:
+        - name: REDIS_HOST
+          value: "redis"         # DNS name of the redis Service
+        - name: REDIS_PORT
+          value: "6379"
+        - name: S3_HOST
+          value: "rustfs:9000"   # RustFS, via the ExternalName service in rustfs/
+        - name: S3_ACCESS_KEY
+          valueFrom:
+            secretKeyRef: {name: rustfs-creds, key: access_key}
+        - name: S3_SECRET_KEY
+          valueFrom:
+            secretKeyRef: {name: rustfs-creds, key: secret_key}
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            memory: 512Mi
+        # Kubernetes only sends traffic to the pod once "/" answers 200,
+        # and restarts it if "/" stops answering.
+        readinessProbe:
+          httpGet: {path: /, port: 5000}
+          initialDelaySeconds: 3
+          periodSeconds: 5
+        livenessProbe:
+          httpGet: {path: /, port: 5000}
+          initialDelaySeconds: 10
+          periodSeconds: 20

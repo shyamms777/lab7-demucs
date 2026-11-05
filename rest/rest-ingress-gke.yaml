@@ -1,0 +1,16 @@
+#
+# GKE version: uses Google's HTTP(S) load balancer.
+# Requires rest-service to be `type: NodePort` and "/" to return 200.
+#
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rest-ingress
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+spec:
+  defaultBackend:
+    service:
+      name: rest-service
+      port:
+        number: 5000

@@ -1,16 +1,27 @@
 #
 # See https://kubernetes.io/docs/concepts/services-networking/ingress/
 #
+# Local (Docker Desktop / minikube) version using ingress-nginx.
+# For GKE use rest-ingress-gke.yaml instead.
+#
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: frontend-ingress
+  name: rest-ingress
   annotations:
-    # use the shared ingress-nginx
-    kubernetes.io/ingress.class: "nginx"
-    nginx.ingress.kubernetes.io/proxy-body-size: 16m
+    # MP3s are big; nginx's default 1 MB body limit would reject them (413).
+    nginx.ingress.kubernetes.io/proxy-body-size: 64m
+    # Separation requests can take a few seconds to upload/accept.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
 spec:
+  ingressClassName: nginx
   rules:
-#
-# Your ingress rules here
-#
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: rest-service
+            port:
+              number: 5000

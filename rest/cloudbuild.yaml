@@ -1,0 +1,9 @@
+#
+# Build the REST image with Google Cloud Build and push it to Artifact Registry.
+# Used by `make cloud` in this directory:
+#   gcloud builds submit . --config cloudbuild.yaml --substitutions=_IMAGE=<registry path>:<tag>
+#
+steps:
+- name: gcr.io/cloud-builders/docker
+  args: ["build", "-f", "Dockerfile-rest", "-t", "$_IMAGE", "."]
+images: ["$_IMAGE"]

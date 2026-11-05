@@ -1,0 +1,112 @@
+#
+# RustFS: an S3-compatible object store, replacing MinIO (no longer supported).
+# Plain-YAML version of the course tutorial's Helm install
+# (kubernetes-tutorial/06-rustfs): same namespace, ports and demo credentials.
+#
+#   kubectl apply -f rustfs/rustfs-deployment.yaml
+#
+# S3 API:  rustfs.rustfs-ns.svc.cluster.local:9000
+# Console: port 9001  (kubectl port-forward -n rustfs-ns svc/rustfs 9001:9001)
+#
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rustfs-ns
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rustfs-creds
+  namespace: rustfs-ns
+type: Opaque
+stringData:                 # demo values from the course tutorial; dev only
+  access_key: rustfs-lab-user
+  secret_key: replace-this-demo-secret
+---
+# Persistent storage: objects survive the RustFS pod being restarted or replaced.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rustfs-data
+  namespace: rustfs-ns
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi          # uses the cluster's default StorageClass
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rustfs
+  namespace: rustfs-ns
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate          # the volume can only be mounted by one pod at a time
+  selector:
+    matchLabels:
+      app: rustfs
+  template:
+    metadata:
+      labels:
+        app: rustfs
+    spec:
+      securityContext:
+        runAsUser: 10001    # the image's "rustfs" user
+        runAsGroup: 10001
+        fsGroup: 10001      # lets that user write to the mounted volume
+      containers:
+      - name: rustfs
+        image: rustfs/rustfs:1.0.4
+        env:
+        - name: RUSTFS_ACCESS_KEY
+          valueFrom:
+            secretKeyRef: {name: rustfs-creds, key: access_key}
+        - name: RUSTFS_SECRET_KEY
+          valueFrom:
+            secretKeyRef: {name: rustfs-creds, key: secret_key}
+        - name: RUSTFS_VOLUMES
+          value: /data
+        - name: RUSTFS_CONSOLE_ENABLE
+          value: "true"
+        - name: RUSTFS_OBS_LOG_DIRECTORY
+          value: ""         # empty = log to stdout, so `kubectl logs` shows it
+        ports:
+        - name: s3
+          containerPort: 9000
+        - name: console
+          containerPort: 9001
+        readinessProbe:
+          httpGet: {path: /health, port: 9000}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 1Gi
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: rustfs-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rustfs
+  namespace: rustfs-ns
+spec:
+  selector:
+    app: rustfs
+  ports:
+  - name: s3
+    port: 9000
+    targetPort: 9000
+  - name: console
+    port: 9001
+    targetPort: 9001

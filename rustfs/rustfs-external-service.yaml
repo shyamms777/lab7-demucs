@@ -1,0 +1,12 @@
+#
+# Alias so pods in the `default` namespace can reach RustFS as plain `rustfs`
+# (rustfs:9000) instead of the full cross-namespace DNS name.
+#
+apiVersion: v1
+kind: Service
+metadata:
+  name: rustfs
+  namespace: default
+spec:
+  type: ExternalName
+  externalName: rustfs.rustfs-ns.svc.cluster.local
